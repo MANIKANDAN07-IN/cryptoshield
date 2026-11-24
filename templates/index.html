@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoShield - Deepfake Scam Detector</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .history-card {
+            background-color: #1e293b;
+            color: #f8fafc;
+            border-radius: 8px;
+            padding: 10px 12px;
+        }
+        .history-card small {
+            color: #cbd5e1 !important;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('home') }}">🛡️ CryptoShield</a>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('home') }}">1. Welcome</a>
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('auth_page') }}">2. Sign Up / Log In</a>
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('scanner_page') }}">3. Scanner</a>
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('output_page') }}">4. Output & History</a>
+                <a class="btn btn-sm btn-outline-light" href="{{ url_for('feedback') }}">5. Feedback</a>
+                {% if current_user %}
+                    <span class="badge bg-info text-dark">{{ current_user }}</span>
+                    <a class="btn btn-sm btn-outline-warning" href="{{ url_for('logout') }}">Logout</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4 mb-5">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, msg in messages %}
+                    <div class="alert alert-{% if category == 'error' %}danger{% elif category == 'success' %}success{% else %}info{% endif %} alert-dismissible fade show" role="alert">
+                        {{ msg }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if page == "welcome" %}
+        <!-- PAGE 1: WELCOME -->
+        <div class="card shadow p-4">
+            <h1 class="mb-3">Welcome to CryptoShield</h1>
+            <p class="lead">
+                Detect manipulated videos, deepfake audio/visual patterns, and crypto giveaway traps from uploaded files or social media links.
+            </p>
+            <hr>
+            <div class="row g-3 mt-1">
+                <div class="col-md-4">
+                    <h5>1. Account & History</h5>
+                    <p class="text-muted small">Create an account with your name, email, and phone number to keep your personal scan history.</p>
+                </div>
+                <div class="col-md-4">
+                    <h5>2. File & Link Scanning</h5>
+                    <p class="text-muted small">Choose a video from your device or paste a social media URL and measure processing time.</p>
+                </div>
+                <div class="col-md-4">
+                    <h5>3. Clear Evidence Report</h5>
+                    <p class="text-muted small">Inspect deepfake probability, heatmaps, spectrogram, timeline, and crypto scam flags.</p>
+                </div>
+            </div>
+            <div class="mt-4 d-flex gap-2">
+                <a href="{{ url_for('auth_page') }}" class="btn btn-primary">Go to Sign Up / Log In</a>
+                <a href="{{ url_for('scanner_page') }}" class="btn btn-success">Open Video Scanner</a>
+            </div>
+        </div>
+
+        {% elif page == "auth" %}
+        <!-- PAGE 2: SIGN UP & LOG IN -->
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">Sign Up</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('signup') }}">
+                            <div class="mb-3">
+                                <label class="form-label">Full Name</label>
+                                <input type="text" name="full_name" class="form-control" required maxlength="100">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Email Address</label>
+                                <input type="email" name="email" class="form-control" required maxlength="150">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Phone Number</label>
+                                <input type="tel" name="phone" class="form-control" required maxlength="25" placeholder="+91 98765 43210">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Password (min 8 characters)</label>
+                                <input type="password" name="password" class="form-control" required minlength="8">
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Create Account</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-header bg-dark text-white">
+                        <h4 class="mb-0">Log In</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('login') }}">
+                            <div class="mb-3">
+                                <label class="form-label">Email Address</label>
+                                <input type="email" name="email" class="form-control" required maxlength="150">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Password</label>
+                                <input type="password" name="password" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">Log In</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% elif page == "scanner" %}
+        <!-- PAGE 3: 2 BUTTONS (FROM FILES / FROM SOCIAL MEDIA) + PROCESSING TIME -->
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">Analyze Video</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="btn-group w-100 mb-3" role="group" aria-label="Video Source Mode">
+                            <button type="button" class="btn btn-outline-primary active" id="btnModeFile">
+                                📁 From Files
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" id="btnModeSocial">
+                                🌐 From Social Media
+                            </button>
+                        </div>
+
+                        <form id="analysisForm">
+                            <input type="hidden" name="source_mode" id="sourceMode" value="file">
+
+                            <div class="mb-3" id="fileInputGroup">
+                                <label class="form-label">Select Video From Files (.mp4, .mov, .avi, .mkv, .webm — max {{ max_upload_mb }} MB)</label>
+                                <input type="file" class="form-control" id="videoFile" name="video_file" accept="video/*">
+                            </div>
+
+                            <div class="mb-3 d-none" id="socialInputGroup">
+                                <label class="form-label">Paste Social Media Video URL</label>
+                                <input type="url" class="form-control" id="videoUrl" name="video_url" placeholder="https://www.youtube.com/watch?v=...">
+                            </div>
+
+                            <button type="submit" class="btn btn-success w-100" id="analyzeBtn">Analyze Video</button>
+                        </form>
+
+                        <div id="loading" class="text-center mt-4 d-none">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="mt-2 text-muted">Analyzing video with AI...</p>
+                        </div>
+
+                        <div id="scannerStatus" class="alert alert-info mt-3 d-none">
+                            <strong>Processing Time:</strong> <span id="liveProcessingTime">0.00s</span> —
+                            <a href="{{ url_for('output_page') }}" class="alert-link">View Full Output & History</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% elif page == "output" %}
+        <!-- PAGE 4: OUTPUT + USER SCAN HISTORY (+ OWNER USER RECORDS) -->
+        <div class="row g-4">
+            <div class="col-md-8">
+                <div id="results" class="card shadow d-none">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">Analysis Output</h4>
+                        <button type="button" class="btn btn-sm btn-light" id="closeResultBtn">✕ Close Result</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert" id="verdictAlert" role="alert">
+                            <h4 id="verdictText"></h4>
+                            <p class="mb-1">Fake Probability: <strong id="fakePercentage"></strong></p>
+                            <p class="mb-1">Processing Time: <strong id="processingTimeValue"></strong></p>
+                            <p class="mb-0 small" id="verdictSummary"></p>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-3 h-100">
+                                    <div class="card-header bg-light">Crypto Scanner Results</div>
+                                    <div class="card-body">
+                                        <ul class="list-unstyled mb-0" id="cryptoTrapsList"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card mb-3 h-100">
+                                    <div class="card-header bg-light">Audio Spectrogram</div>
+                                    <div class="card-body">
+                                        <div id="spectrogramContainer"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">Deepfake Pulse Timeline</div>
+                            <div class="card-body" id="timelineContainer">
+                                <p class="text-muted mb-0">No timeline generated</p>
+                            </div>
+                        </div>
+
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">Evidence Gallery (Grad-CAM Heatmaps)</div>
+                            <div class="card-body" id="evidenceGallery">
+                                <p class="text-muted mb-0">No heatmaps generated</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="noActiveResult" class="card shadow p-4">
+                    <h5 class="mb-2">No Active Scan Output Displayed</h5>
+                    <p class="text-muted mb-3">Run a scan on the Scanner page or click ✕ Close Result to dismiss an open report.</p>
+                    <a href="{{ url_for('scanner_page') }}" class="btn btn-primary btn-sm" style="width: fit-content;">Go to Scanner</a>
+                </div>
+
+                {% if is_owner %}
+                <div class="card shadow mt-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">👑 Owner View: Registered Users</h5>
+                    </div>
+                    <div class="card-body table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone No.</th>
+                                    <th>Joined</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for u in owner_users %}
+                                <tr>
+                                    <td>{{ u.full_name }}</td>
+                                    <td>{{ u.email }}</td>
+                                    <td>{{ u.phone }}</td>
+                                    <td>{{ u.created_at }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">🕒 My Scan History</h5>
+                    </div>
+                    <div class="card-body" id="userHistoryList">
+                        {% if user_scans %}
+                            {% for scan in user_scans %}
+                            <div class="history-card mb-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <strong class="text-break me-2">{{ scan.filename }}</strong>
+                                    <span class="badge {% if scan.is_fake %}bg-danger{% else %}bg-success{% endif %}">
+                                        {{ scan.fake_probability }}%
+                                    </span>
+                                </div>
+                                <small class="d-block mt-1">Processed in {{ scan.processing_time }}s</small>
+                                <small class="d-block mt-1">{{ scan.summary }}</small>
+                                <small class="d-block mt-1">{{ scan.created_at }}</small>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted mb-0">No scans in your history yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% elif page == "feedback" %}
+        <!-- PAGE 5: FEEDBACK -->
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">Submit Feedback</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('feedback') }}">
+                            <div class="mb-3">
+                                <label class="form-label">Your Name</label>
+                                <input type="text" name="name" class="form-control" value="{{ current_user or '' }}" required maxlength="100">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Rating (1 to 5)</label>
+                                <select name="rating" class="form-select">
+                                    <option value="5">5 - Excellent</option>
+                                    <option value="4">4 - Good</option>
+                                    <option value="3">3 - Average</option>
+                                    <option value="2">2 - Poor</option>
+                                    <option value="1">1 - Very Poor</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Comment</label>
+                                <textarea name="comment" class="form-control" rows="4" required maxlength="1000"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">Submit Feedback</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">Recent Feedback</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_feedback %}
+                            {% for fb in recent_feedback %}
+                            <div class="border-bottom pb-2 mb-2">
+                                <strong>{{ fb.name }}</strong> — <span class="badge bg-primary">{{ fb.rating }}/5</span>
+                                <p class="mb-1 mt-1">{{ fb.comment }}</p>
+                                <small class="text-muted">{{ fb.created_at }}</small>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted mb-0">No feedback submitted yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const STORAGE_KEY = "cryptoshield_last_result";
+
+        function isSafeOutputUrl(url) {
+            return typeof url === "string" && url.startsWith("/static/outputs/");
+        }
+
+        function renderImageOrFallback(containerId, url, altText, fallbackText, isGalleryItem = false) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.replaceChildren();
+
+            if (isSafeOutputUrl(url)) {
+                const img = document.createElement("img");
+                img.src = url;
+                img.alt = altText;
+                img.className = isGalleryItem
+                    ? "img-thumbnail me-2 mb-2 evidence-img"
+                    : "img-fluid rounded evidence-img";
+                if (isGalleryItem) {
+                    img.style.width = "220px";
+                }
+                container.appendChild(img);
+            } else {
+                const p = document.createElement("p");
+                p.className = "text-muted mb-0";
+                p.textContent = fallbackText;
+                container.appendChild(p);
+            }
+        }
+
+        function renderSavedResultOnOutputPage() {
+            const resultsCard = document.getElementById("results");
+            const emptyCard = document.getElementById("noActiveResult");
+            if (!resultsCard || !emptyCard) return;
+
+            const raw = sessionStorage.getItem(STORAGE_KEY);
+            if (!raw) {
+                resultsCard.classList.add("d-none");
+                emptyCard.classList.remove("d-none");
+                return;
+            }
+
+            const data = JSON.parse(raw);
+            emptyCard.classList.add("d-none");
+            resultsCard.classList.remove("d-none");
+
+            const verdictAlert = document.getElementById("verdictAlert");
+            verdictAlert.className = data.is_fake ? "alert alert-danger" : "alert alert-success";
+
+            document.getElementById("verdictText").textContent = data.verdict_title || "Scan Complete";
+            document.getElementById("fakePercentage").textContent = `${data.fake_probability ?? 0}%`;
+            document.getElementById("processingTimeValue").textContent = `${data.processing_time ?? 0}s`;
+            document.getElementById("verdictSummary").textContent = data.verdict_summary || "";
+
+            const trapsList = document.getElementById("cryptoTrapsList");
+            trapsList.replaceChildren();
+            const traps = Array.isArray(data.crypto_traps) ? data.crypto_traps : [];
+            if (traps.length > 0) {
+                traps.forEach((trap) => {
+                    const li = document.createElement("li");
+                    li.className = "mb-1";
+                    li.textContent = `• ${trap}`;
+                    trapsList.appendChild(li);
+                });
+            } else {
+                const li = document.createElement("li");
+                li.className = "text-muted";
+                li.textContent = "None detected";
+                trapsList.appendChild(li);
+            }
+
+            renderImageOrFallback("spectrogramContainer", data.spectrogram_url, "Audio Spectrogram", "No spectrogram available");
+            renderImageOrFallback("timelineContainer", data.timeline_url, "Deepfake Timeline", "No timeline generated");
+
+            const gallery = document.getElementById("evidenceGallery");
+            gallery.replaceChildren();
+            const heatmaps = Array.isArray(data.gradcam_images) ? data.gradcam_images.filter(isSafeOutputUrl) : [];
+            if (heatmaps.length > 0) {
+                heatmaps.forEach((h) => {
+                    const img = document.createElement("img");
+                    img.src = h;
+                    img.alt = "Grad-CAM Heatmap";
+                    img.className = "img-thumbnail me-2 mb-2 evidence-img";
+                    img.style.width = "220px";
+                    gallery.appendChild(img);
+                });
+            } else {
+                const p = document.createElement("p");
+                p.className = "text-muted mb-0";
+                p.textContent = "No heatmaps generated";
+                gallery.appendChild(p);
+            }
+        }
+
+        const closeResultBtn = document.getElementById("closeResultBtn");
+        if (closeResultBtn) {
+            closeResultBtn.addEventListener("click", function() {
+                sessionStorage.removeItem(STORAGE_KEY);
+                renderSavedResultOnOutputPage();
+            });
+        }
+
+        renderSavedResultOnOutputPage();
+
+        const btnModeFile = document.getElementById("btnModeFile");
+        const btnModeSocial = document.getElementById("btnModeSocial");
+        const sourceModeInput = document.getElementById("sourceMode");
+        const fileInputGroup = document.getElementById("fileInputGroup");
+        const socialInputGroup = document.getElementById("socialInputGroup");
+
+        if (btnModeFile && btnModeSocial) {
+            btnModeFile.addEventListener("click", function() {
+                sourceModeInput.value = "file";
+                btnModeFile.classList.add("active");
+                btnModeSocial.classList.remove("active");
+                fileInputGroup.classList.remove("d-none");
+                socialInputGroup.classList.add("d-none");
+                document.getElementById("videoUrl").value = "";
+            });
+
+            btnModeSocial.addEventListener("click", function() {
+                sourceModeInput.value = "social";
+                btnModeSocial.classList.add("active");
+                btnModeFile.classList.remove("active");
+                socialInputGroup.classList.remove("d-none");
+                fileInputGroup.classList.add("d-none");
+                document.getElementById("videoFile").value = "";
+            });
+        }
+
+        const analysisForm = document.getElementById("analysisForm");
+        if (analysisForm) {
+            analysisForm.addEventListener("submit", async function(e) {
+                e.preventDefault();
+
+                const formData = new FormData(analysisForm);
+                const mode = formData.get("source_mode");
+                const fileInput = document.getElementById("videoFile");
+                const urlInput = document.getElementById("videoUrl");
+
+                if (mode === "file" && (!fileInput.files || fileInput.files.length === 0)) {
+                    alert("Please select a video file.");
+                    return;
+                }
+                if (mode === "social" && urlInput.value.trim() === "") {
+                    alert("Please paste a social media URL.");
+                    return;
+                }
+
+                document.getElementById("loading").classList.remove("d-none");
+                document.getElementById("scannerStatus").classList.add("d-none");
+                document.getElementById("analyzeBtn").disabled = true;
+
+                try {
+                    const response = await fetch("/analyze", {
+                        method: "POST",
+                        body: formData
+                    });
+                    const rawText = await response.text();
+                    let data = {};
+                    try {
+                        data = JSON.parse(rawText);
+                    } catch (parseErr) {
+                        throw new Error(`HTTP ${response.status}: ${rawText.slice(0, 200) || "Invalid JSON response"}`);
+                    }
+
+                    if (!response.ok || data.error) {
+                        throw new Error(`HTTP ${response.status} - ${data.error || "Analysis failed."}`);
+                    }
+
+                    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                    document.getElementById("liveProcessingTime").textContent = `${data.processing_time ?? 0}s`;
+                    document.getElementById("scannerStatus").classList.remove("d-none");
+                } catch (error) {
+                    alert(error.message || "Something went wrong.");
+                    console.error(error);
+                } finally {
+                    document.getElementById("loading").classList.add("d-none");
+                    document.getElementById("analyzeBtn").disabled = false;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
